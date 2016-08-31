@@ -4,12 +4,12 @@ class plugins_can:
 	h = {}
 
 	def do_action(self,n,*a):
-		return self.execute_hooked_functions(False,n,*a)
+		return self.importall_hooked_functions(False,n,*a)
 
 	def apply_filters(self,n,*a):
-		return self.execute_hooked_functions(True,n,*a)
+		return self.importall_hooked_functions(True,n,*a)
 
-	def execute_hooked_functions(self,g,n,*a):
+	def importall_hooked_functions(self,g,n,*a):
 		a = list(a)
 		if n in self.h:
 			for p in sorted(self.h[n]):
@@ -18,6 +18,17 @@ class plugins_can:
 					a[0] = r if g else a[0]
 			return a[0] if g else True
 		return False
+		
+	def do_all(self,o):
+		@self.do_before
+		@self.filter_args
+		@self.do_after
+		@self.filter_return
+		@self.replace
+		@wraps(o)
+		def wrapper(*a, **k):
+			return o(*a,**k)
+		return wrapper
 
 	def do_before(self,o):
 		@wraps(o)
@@ -74,7 +85,7 @@ def add_filter(n,f,p=10):
 
 add_action = add_filter
 
-def execute( d = [] ):
+def import_plugins( d = [] ):
 	if d == []:
 		import sys
 		from os.path import dirname
@@ -84,3 +95,27 @@ def execute( d = [] ):
 	for x in glob.glob(join(*d)):
 		if isfile(x):
 			 execfile(x)
+			 
+if __name__ == '__main__':
+    #load plugins
+	importall()
+
+	global project
+	import os
+	import types
+	import imp
+	import sys
+	sys.path.append(os.path.dirname(sys.argv[1]))
+	try:
+		project = __import__(os.path.basename(sys.argv[1])[:-3])
+		sys.modules['project'] = project
+	finally:
+		del sys.path[-1]
+
+	#auto decorate what was given to us as arg 1
+	for k,v in vars(project).items():
+		if isinstance(v, types.FunctionType):
+			vars(project)[k] = can.do_all(v)
+	
+	#initiate the loaded module
+	print project.main()
