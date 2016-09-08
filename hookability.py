@@ -28,21 +28,21 @@ class plugins_can:
 		@self.replace
 		@wraps(o)
 		def wrapper(*a, **k):
-			print '{}__{}'.format(o.__module__,o.__name__)
+			print '{}||{}'.format(o.__module__,o.__name__)
 			return o(*a,**k)
 		return wrapper
 
 	def do_before(self,o):
 		@wraps(o)
 		def wrapper(*a, **k):
-			self.do_action('before_{}__{}'.format(o.__module__,o.__name__),*a)
+			self.do_action('before_{}||{}'.format(o.__module__,o.__name__),*a)
 			return o(*a, **k)
 		return wrapper
 
 	def filter_args(self,o):
 		@wraps(o)
 		def wrapper(*a, **k):
-			n = 'args_{}__{}'.format(o.__module__,o.__name__)
+			n = 'args_{}||{}'.format(o.__module__,o.__name__)
 			if n in self.h:
 				a = {self.apply_filters(n,*a)}
 			return o(*a,**k)
@@ -51,7 +51,7 @@ class plugins_can:
 	def replace(self,o):
 		@wraps(o)
 		def wrapper(*a, **k):
-			n = 'replace_{}__{}'.format(o.__module__,o.__name__)
+			n = 'replace_{}||{}'.format(o.__module__,o.__name__)
 			if n in self.h:
 				return self.apply_filters(n,*a)
 			else:
@@ -61,7 +61,7 @@ class plugins_can:
 	def filter_return(self,o):
 		@wraps(o)
 		def wrapper(*a, **k):
-			n = 'return_{}__{}'.format(o.__module__,o.__name__)
+			n = 'return_{}||{}'.format(o.__module__,o.__name__)
 			r = o(*a,**k)
 			if n in self.h:
 				return self.apply_filters(n,r,*a)
@@ -73,7 +73,7 @@ class plugins_can:
 		@wraps(o)
 		def wrapper(*a, **k):
 			r = o(*a, **k)
-			self.do_action('after_{}__{}'.format(o.__module__,o.__name__),r,*a)
+			self.do_action('after_{}||{}'.format(o.__module__,o.__name__),r,*a)
 			return r
 		return wrapper
 
@@ -176,9 +176,17 @@ def import_and_hook( filepath = None, *to_hook ):
 				module = imp.load_module(name, fd, fn, info)
 			
 			if 1:#name in self.module_names:
-				for k,v in vars(module).items():
-					if isinstance(v, types.FunctionType):
-						vars(module)[k] = can.do_all(v)
+									
+				def decorate_all_children(parent, depth = 0):
+					depth = depth + 1
+					for k,v in vars(parent).items():
+						if isinstance(v, types.FunctionType):
+							vars(parent)[k] = can.do_all(v)
+						else:
+							if isinstance(v, types.ClassType):
+								decorate_all_children( vars(parent)[k], depth )
+							
+				decorate_all_children(module)
 
 			sys.modules[name] = module
 			return module
@@ -223,7 +231,6 @@ def import_and_hook( filepath = None, *to_hook ):
 			return module_info[2][2] == imp.PKG_DIRECTORY
 	
 		def old_load_module(self, name):
-			print 'loading hooked: '+name
 			if name in sys.modules:
 				return sys.modules[name]
 			module_info = imp.find_module(name, self.path)
@@ -252,4 +259,4 @@ if __name__ == '__main__':
 	project = import_and_hook()
 	
 	#initiate the loaded module
-	print project.main()
+	project.main()
